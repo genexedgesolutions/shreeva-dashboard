@@ -121,14 +121,23 @@ body {
 }
 
 .nav a:hover {
-    background: var(--surface);
-    color: var(--text);
+    background: linear-gradient(135deg, #4b0055 0%, /* deep royal purple */ #6a0dad 40%, /* rich purple accent */ #c8a24a 100% /* metallic gold */) !important;
+    color:white;
+    text-decoration: none;
     transform: translateX(4px)
+}
+a {
+     text-decoration: none;
+}
+a:hover {
+     text-decoration: none;
 }
 
 .nav a.active {
-    background: linear-gradient(90deg, rgba(14, 165, 164, 0.10), rgba(14, 165, 164, 0.06));
-    color: var(--accent-600)
+    background: linear-gradient(135deg, #4b0055 0%, /* deep royal purple */ #6a0dad 40%, /* rich purple accent */ #c8a24a 100% /* metallic gold */) !important;
+    color: var(--accent-600);
+    text-decoration: none;
+    color:white
 }
 
 /* Panel / content */
@@ -355,4 +364,73 @@ label {
 
 .Toastify__close-button--default {
     color: var(--muted);
+}
+
+/* globals.css */
+
+/* Form container */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Each row */
+.form-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.form-row label {
+  font-weight: 500;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+/* Inputs, textareas, selects */
+.form-row input,
+.form-row textarea,
+.form-row select {
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+/* Focus state */
+.form-row input:focus,
+.form-row textarea:focus,
+.form-row select:focus {
+  border-color: #0070f3;
+  box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.15);
+  outline: none;
+}
+
+/* Buttons */
+button.btn {
+  background: #0070f3;
+  color: white;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button.btn:hover {
+  background: #005bb5;
+}
+
+button.btn.ghost {
+  background: transparent;
+  border: 1px solid #ccc;
+  color: #333;
+}
+.bg-gradient {
+    background: linear-gradient(135deg, #4b0055 0%, /* deep royal purple */ #6a0dad 40%, /* rich purple accent */ #c8a24a 100% /* metallic gold */) !important;
+    color: white !important;
 }

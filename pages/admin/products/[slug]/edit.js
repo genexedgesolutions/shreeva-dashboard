@@ -7,36 +7,65 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import Link from 'next/link';
 
-const fetchProduct = async (pid) => {
+// dynamic import CKEditor for Next.js (no SSR)
+import dynamic from "next/dynamic";
+const CKEditor = dynamic(() => import("@ckeditor/ckeditor5-react").then((m) => m.CKEditor), { ssr: false });
+const ClassicEditor = dynamic(() => import("@ckeditor/ckeditor5-build-classic"), { ssr: false });
+
+
+
+const fetchProduct = async (slug) => {
   // try by id first
   try {
-    const res = await api.get(`/products/${pid}`, { params: { _t: Date.now() } });
+    const res = await api.get(`/products/get-single-product/${slug}`, { params: { _t: Date.now() } });
     // normalize
     return res?.product ?? res;
   } catch (err) {
     // if id lookup fails, try slug
-    const res2 = await api.get(`/products/slug/${pid}`, { params: { _t: Date.now() } });
+    const res2 = await api.get(`/products/get-single-product/${slug}`, { params: { _t: Date.now() } });
     return res2?.product ?? res2;
   }
 };
 
 export default function EditProduct() {
   const router = useRouter();
-  const { pid } = router.query;
+  const { slug } = router.query;
 
-  const { data, error, mutate } = useSWR(pid ? ['product', pid] : null, () => fetchProduct(pid));
-
+  const { data, error, mutate } = useSWR(slug ? ['product', slug] : null, () => fetchProduct(slug));
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(null);
   const [newImages, setNewImages] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [saving, setSaving] = useState(false);
   const [variantsJson, setVariantsJson] = useState('');
 
+  
+  // handler to set rich-text description
+  const handleDescriptionChange = (event, editor) => {
+    const data = editor.getData();
+    setForm((p) => ({ ...p, description: data }));
+  };
+
+  // handler to set shortDescription (if you had a textarea for shortDescription; you currently use input)
+  const handleShortDescriptionChange = (event, editor) => {
+    const data = editor.getData();
+    setForm((p) => ({ ...p, shortDescription: data }));
+  };
+
+  // handler for variantsJson when using CKEditor (will keep JSON string)
+  const handleVariantsEditorChange = (event, editor) => {
+    const data = editor.getData();
+    // CKEditor returns HTML — if you intend to keep JSON, we store the editor content as-is,
+    // but you should prefer the plain textarea for valid JSON.
+    setVariantsJson(data);
+  };
+
   useEffect(() => {
     if (!data) return;
     // data might be product object or wrapper
-    const prod = data?.product ?? data;
+    const prod = data?.products ?? data;
     setForm({
+      _id: prod._id,
       title: prod.title ?? prod.post_title ?? prod.name ?? '',
       slug: prod.slug ?? prod.post_name ?? '',
       sku: prod.sku ?? '',
@@ -69,6 +98,28 @@ export default function EditProduct() {
     if (prod.variants) setVariantsJson(JSON.stringify(prod.variants, null, 2));
   }, [data]);
 
+useEffect(() => {
+  async function fetchCategories() {
+    try {
+      const res = await api.get("/categories");
+      const cats = res?.data?.categories || res?.categories || res || [];
+
+      // sort by name (case-insensitive, diacritic-insensitive)
+      const sorted = Array.isArray(cats)
+        ? cats.slice().sort((a, b) =>
+            String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
+          )
+        : [];
+
+      setCategories(sorted);
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  }
+  fetchCategories();
+}, []);
+
+
   useEffect(() => {
     // generate previews for selected files
     if (!newImages || newImages.length === 0) {
@@ -91,62 +142,86 @@ export default function EditProduct() {
     setNewImages(Array.from(e.target.files || []));
   }
 
-  async function handleSave(e) {
-    e.preventDefault();
-    if (!form?.title) {
-      toast.error('Title required');
-      return;
-    }
-    setSaving(true);
-    try {
-      const fd = new FormData();
-      fd.append('title', form.title);
-      if (form.slug) fd.append('slug', form.slug);
-      fd.append('sku', form.sku);
-      fd.append('shortDescription', form.shortDescription);
-      fd.append('description', form.description);
-      fd.append('category', form.category);
-      fd.append('brand', form.brand);
-      fd.append('basePrice', String(form.basePrice || '0'));
-      if (form.salePrice) fd.append('salePrice', String(form.salePrice));
-      fd.append('productType', form.productType);
-      fd.append('isPublished', form.isPublished ? 'true' : 'false');
-      fd.append('isMadeToOrder', form.isMadeToOrder ? 'true' : 'false');
-      fd.append('leadTimeDays', String(form.leadTimeDays || 0));
-      fd.append('allowResizing', form.allowResizing ? 'true' : 'false');
-      fd.append('allowEngraving', form.allowEngraving ? 'true' : 'false');
-      fd.append('makingCharges', String(form.makingCharges || 0));
-      fd.append('stockQuantity', String(form.stockQuantity || 0));
-      fd.append('manageStock', form.manageStock ? 'true' : 'false');
-      if (form.weightGrams) fd.append('weightGrams', String(form.weightGrams));
-      fd.append('metaTitle', form.metaTitle || '');
-      fd.append('metaDescription', form.metaDescription || '');
-      fd.append('featured', form.featured ? 'true' : 'false');
-      fd.append('returnable', form.returnable ? 'true' : 'false');
-      fd.append('warranty', form.warranty || '');
-      if (variantsJson) fd.append('variants', variantsJson);
-
-      newImages.forEach((f) => fd.append('images', f)); // matches upload.array("images")
-
-      const res = await api.put(`/products/${form._id}`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const body = res?.data ?? res;
-      if (body?.success || res?.success) {
-        toast.success('Product updated');
-        mutate();
-        setTimeout(() => router.push('/admin/products'), 300);
-      } else {
-        toast.error(body?.message || 'Update failed');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(err?.response?.data?.message || err.message || 'Error');
-    } finally {
-      setSaving(false);
-    }
+ async function handleSave(e) {
+  e.preventDefault();
+  if (!form?.title) {
+    toast.error('Title required');
+    return;
   }
+  setSaving(true);
+  try {
+    // determine product id (prefer form._id)
+    const productId = form._id || data?.product?._id || data?._id || router.query.pid;
+    if (!productId) {
+      throw new Error("Product ID not found — cannot save");
+    }
+
+    const fd = new FormData();
+    // Basic fields
+    fd.append('_id', productId); // ensure backend receives id in body too
+    fd.append('title', form.title || '');
+    fd.append('slug', form.slug || '');
+    fd.append('sku', form.sku || '');
+    fd.append('shortDescription', form.shortDescription || '');
+    fd.append('description', form.description || '');
+    fd.append('category', form.category || '');
+    fd.append('brand', form.brand || '');
+    fd.append('basePrice', String(form.basePrice ?? '0'));
+    if (form.salePrice || form.salePrice === 0) fd.append('salePrice', String(form.salePrice));
+    fd.append('productType', form.productType || 'single');
+    fd.append('isPublished', form.isPublished ? 'true' : 'false');
+    fd.append('isMadeToOrder', form.isMadeToOrder ? 'true' : 'false');
+    fd.append('leadTimeDays', String(form.leadTimeDays ?? 0));
+    fd.append('allowResizing', form.allowResizing ? 'true' : 'false');
+    fd.append('allowEngraving', form.allowEngraving ? 'true' : 'false');
+    fd.append('makingCharges', String(form.makingCharges ?? 0));
+    fd.append('stockQuantity', String(form.stockQuantity ?? 0));
+    fd.append('manageStock', form.manageStock ? 'true' : 'false');
+    if (form.weightGrams !== undefined && form.weightGrams !== null) fd.append('weightGrams', String(form.weightGrams));
+    fd.append('metaTitle', form.metaTitle || '');
+    fd.append('metaDescription', form.metaDescription || '');
+    fd.append('featured', form.featured ? 'true' : 'false');
+    fd.append('returnable', form.returnable ? 'true' : 'false');
+    fd.append('warranty', form.warranty || '');
+
+    // Variants: ensure it's valid JSON string before appending
+    if (variantsJson) {
+      try {
+        // if variantsJson is already a JSON string, validate/normalize it
+        const parsed = typeof variantsJson === 'string' ? JSON.parse(variantsJson) : variantsJson;
+        fd.append('variants', JSON.stringify(parsed));
+      } catch (err) {
+        // if invalid JSON, still append the raw string so backend can decide
+        console.warn("variantsJson is not valid JSON — sending raw string");
+        fd.append('variants', String(variantsJson));
+      }
+    } else if (form.variants && Array.isArray(form.variants)) {
+      fd.append('variants', JSON.stringify(form.variants));
+    }
+
+    // Append new image files — field name should match multer config on server (images)
+    newImages.forEach((f) => fd.append('images', f));
+
+    // Use the backend update route you have: /products/update-product/:productId
+    const res = await api.put(`/products/${productId}`, fd /* no explicit Content-Type — axios will set it */);
+
+    const body = res?.data ?? res;
+    if (body?.success || res?.success) {
+      toast.success('Product updated');
+      await mutate();
+      // navigate back after slight delay
+      setTimeout(() => router.push('/admin/products'), 300);
+    } else {
+      toast.error(body?.message || 'Update failed');
+    }
+  } catch (err) {
+    console.error("Save product error:", err);
+    toast.error(err?.response?.data?.message || err.message || 'Error saving product');
+  } finally {
+    setSaving(false);
+  }
+}
+
 
   if (error) {
     return (
@@ -177,6 +252,8 @@ export default function EditProduct() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
             {/* Left */}
             <div>
+             
+                           <div className="form-row"><label>id</label><input name="_id" value={form._id} onChange={handleChange} /></div>
               <div className="form-row"><label>Title</label><input name="title" value={form.title} onChange={handleChange} /></div>
               <div className="form-row"><label>Slug</label><input name="slug" value={form.slug} onChange={handleChange} /></div>
               <div className="form-row"><label>SKU</label><input name="sku" value={form.sku} onChange={handleChange} /></div>
@@ -212,7 +289,18 @@ export default function EditProduct() {
                 </div>
               </div>
 
-              <div className="form-row"><label>Category (ID)</label><input name="category" value={form.category} onChange={handleChange} /></div>
+              <div className="form-row">
+  <label>Category</label>
+  <select name="category" value={form.category} onChange={handleChange}>
+    <option value="">— Select Category —</option>
+    {categories.map((c) => (
+      <option key={c._id} value={c._id}>
+        {c.name}
+      </option>
+    ))}
+  </select>
+</div>
+
 
               <div style={{ marginTop: 12 }}>
                 <button className="btn" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>

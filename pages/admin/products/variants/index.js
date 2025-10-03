@@ -1,8 +1,8 @@
 // pages/admin/products/index.js
 import useSWR from 'swr';
-import api from '../../../lib/api';
-import Layout from '../../../components/Layout';
-import AppDataTable from '../../../components/DataTable';
+import api from '../../../../lib/api';
+import Layout from '../../../../components/Layout';
+import AppDataTable from '../../../../components/DataTable';
 import { useMemo } from 'react';
 import { toast } from 'react-toastify';
 import { FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
@@ -88,78 +88,25 @@ export default function ProductsPage() {
         selector: (row) => row.post_title || row.title || row.name,
         sortable: true,
         wrap: true,
-      },
-      {
-        id: 'sku',
-        name: 'SKU',
-        selector: (row) => row.sku || row.variants?.[0]?.sku || '—',
-      },
-      {
-        id: 'price',
-        name: 'Price',
-        selector: (row) => {
-          // support both old and new model shapes
-          if (row.price) return `₹${row.price}`;
-          if (row.basePrice) return `₹${row.basePrice}`;
-          if (row.regular_price) return `₹${row.regular_price}`;
-          return row.meta_total_sales ? `Sold: ${row.meta_total_sales}` : '—';
-        },
-      },
-      {
-        id: 'stock',
-        name: 'Stock',
-        selector: (row) =>
-          row.manageStock ? `${row.stockQuantity ?? row.stockQuantity ?? 0} (${row.stock_status ?? '-'})` : row.stock_status ?? '-',
-      },
-      {
-        id: 'status',
-        name: 'Status',
-        selector: (row) => row.post_status ?? (row.isPublished ? 'publish' : 'draft'),
-        sortable: true,
-      },
-      {
-        id: 'created',
-        name: 'Created At',
-        selector: (row) => (row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'),
-        sortable: true,
+        
       },
       {
         id: 'actions',
         name: 'Actions',
         cell: (row) => (
           <div style={{ display: 'flex', gap: 6 }}>
-            <Link href={`/admin/products/${row._id || row.id}`} legacyBehavior>
+            <Link href={`/admin/products/variants/${row._id || row.id}`} legacyBehavior>
               <a className="btn ghost" style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <FiEye />
               </a>
             </Link>
-
-            <Link href={`/admin/products/${row.slug || row.slug}/edit`} legacyBehavior>
-              <a className="btn" style={{ padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <FiEdit />
-              </a>
-            </Link>
-
-            <button
-              className="btn"
-              style={{
-                background: '#ef4444',
-                color: 'white',
-                padding: '4px 8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-              onClick={() => handleDelete(row._id || row.id, row.post_title || row.title || row.name)}
-            >
-              <FiTrash2 />
-            </button>
           </div>
         ),
         ignoreRowClick: true,
         allowOverflow: true,
         button: true,
       },
+      
     ],
     []
   );
@@ -174,24 +121,21 @@ export default function ProductsPage() {
 
   if (!data) {
     return (
-      <Layout title="Products">
+      <Layout title="">
         <div className="card">⏳ Loading all products...</div>
       </Layout>
     );
   }
 
   return (
-    <Layout title="Products">
+    <Layout title="Products Variants">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h2>Products</h2>
-        <Link href="/admin/products/new" legacyBehavior>
-          <a className="btn">+ Add Product</a>
-        </Link>
+        
       </div>
 
       <div className="card">
         {isValidating && <div style={{ marginBottom: 8 }}>🔄 Refreshing…</div>}
-        <AppDataTable title={`Products (${products.length})`} columns={columns} data={products} selectable={true} defaultSortFieldId="title" />
+        <AppDataTable columns={columns} data={products} selectable={true} defaultSortFieldId="title" />
       </div>
     </Layout>
   );

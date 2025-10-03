@@ -8,6 +8,8 @@
     "start": "next start -p 3001"
   },
   "dependencies": {
+    "@ckeditor/ckeditor5-build-classic": "^41.4.2",
+    "@ckeditor/ckeditor5-react": "^11.0.0",
     "axios": "1.4.0",
     "file-saver": "^2.0.5",
     "html-react-parser": "^5.2.6",
